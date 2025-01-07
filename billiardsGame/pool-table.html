@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool Table</title>
+    <style>
+        body {
+            text-align: center; 
+        }
+
+        #pool-table-con {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); 
+        }
+
+        #pool-table {
+            width: 199px;
+            height: 390px; 
+            border: 1px solid black;
+        }
+
+        .player-info, .start-button  {
+            margin-top: 20px;
+        }
+
+        input[type="text"] {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pool Table</h1>
+    <div class="player-info">
+        <label for="player1-name-input">Player 1:</label>
+        <input id="player1-name-input" type="text" placeholder="Enter Player 1 Name">
+        <br>
+        <label for="player2-name-input">Player 2:</label>
+        <input id="player2-name-input" type="text" placeholder="Enter Player 2 Name">
+    </div>
+    <button id="start-game" class="start-button">Start Game</button>
+    <div id="pool-table-con">
+        <svg id="pool-table" viewBox="-12.5 -12.5 700 1375">
+            <rect width="675" height="1350" x="0" y="0" fill="#C0D0C0" />
+            <rect width="700" height="25" x="-12.5" y="-12.5" fill="darkgreen" />
+            <rect width="700" height="25" x="-12.5" y="1350" fill="darkgreen" />
+            <rect width="25" height="1375" x="-12.5" y="-12.5" fill="darkgreen" />
+            <rect width="25" height="1375" x="675" y="-12.5" fill="darkgreen" />
+            <circle id="white-ball" cx="337.5" cy="1012.5" r="14.25" fill="WHITE" onmousedown="handleMouseDown(event);"/> <!-- Assign id to the white ball -->
+            <circle cx="0.0" cy="0.0" r="57" fill="black" />
+            <circle cx="675.0" cy="0.0" r="57" fill="black" />
+            <circle cx="0.0" cy="675.0" r="57" fill="black" />
+            <circle cx="675.0" cy="675.0" r="57" fill="black" />
+            <circle cx="0.0" cy="1350.0" r="57" fill="black" />
+            <circle cx="675.0" cy="1350.0" r="57" fill="black" />
+            <circle id="ball1" class="ball" cx="337.5" cy="337.5" r="14.25" fill="yellow" />
+            <circle id="ball2" class="ball" cx="322.75" cy="311.82" r="14.25" fill="blue" />
+            <circle id="ball3" class="ball" cx="352.65" cy="310.63" r="14.25" fill="red" />
+        </svg>
+        <div id="game-status"></div>
+    </div>
+
+    <script>
+        var isMouseDown = false;
+        var aimStartX = 0;
+        var aimStartY = 0;
+        var firstPlayer;
+        let movingBallsCount = 0;
+
+        const cueBall = document.getElementById('white-ball');
+        const coloredBall = document.getElementById('colored-ball'); 
+        const poolTable = document.getElementById('pool-table');
+    
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const startGameButton = document.getElementById('start-game');
+            const player1Input = document.getElementById('player1-name-input');
+            const player2Input = document.getElementById('player2-name-input');
+            const gameStatus = document.getElementById('game-status');
+
+            startGameButton.addEventListener('click', function() {
+                let player1Name = player1Input.value.trim();
+                let player2Name = player2Input.value.trim();
+
+                if (!player1Name || !player2Name) {
+                    gameStatus.textContent = "Please enter names for both players.";
+                    return;
+                }
+
+                currentPlayer = Math.random() < 0.5 ? player1Name : player2Name;
+                isGameInProgress = true;
+                movingBallsCount = 0; // Reset moving balls count
+                gameStatus.textContent = `${currentPlayer}'s turn to play!`;
+            });
+        });
+
+        function switchPlayer() {
+            const player1Name = document.getElementById('player1-name-input').value.trim();
+            const player2Name = document.getElementById('player2-name-input').value.trim();
+            currentPlayer = currentPlayer === player1Name ? player2Name : player1Name;
+            updateGameStatus(`${currentPlayer}'s turn to play!`);
+        }
+
+        function updateGameStatus(message) {
+            const gameStatus = document.getElementById('game-status');
+            gameStatus.textContent = message;
+        }
+
+        function onMouseMove(event) {
+            if (isMouseDown) {
+                let svgPoint = getSVGPoint(event);
+                updateAimLine(aimStartX, aimStartY, svgPoint.x, svgPoint.y);
+            }
+        }
+
+        cueBall.addEventListener('mousedown', function(event) {
+            isMouseDown = true;
+            let svgPoint = getSVGPoint(event);
+            aimStartX = svgPoint.x;
+            aimStartY = svgPoint.y;
+            event.preventDefault(); // Prevent any unwanted default behavior
+            poolTable.addEventListener('mousemove', onMouseMove);
+        });
+    
+        document.addEventListener('mouseup', function(event) {
+            if (isMouseDown) {
+                isMouseDown = false;
+                poolTable.removeEventListener('mousemove', onMouseMove);
+                let svgPoint = getSVGPoint(event);
+                shootBall(aimStartX, aimStartY, svgPoint.x, svgPoint.y);
+            }
+        });
+    
+        function updateAimLine(x_1, y_1, x_2, y_2) {
+            let line = document.getElementById('aimline') || createAimLine();
+            line.setAttribute('x1', x_1);
+            line.setAttribute('y1', y_1);
+            line.setAttribute('x2', x_2);
+            line.setAttribute('y2', y_2);
+        }
+    
+        function createAimLine() {
+            let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute('id', 'aimline');
+            line.setAttribute('stroke', 'white');
+            line.setAttribute('stroke-width', '3.5');
+            poolTable.appendChild(line);
+            return line;
+        }
+    
+        const tableBounds = {
+            minX: 25, // Left cushion
+            maxX: 650, // Right cushion
+            minY: 25, // Top cushion
+            maxY: 1325 // Bottom cushion
+        };
+
+        
+        function shootBall(x1, y1, x2, y2) {
+            document.getElementById('aimline')?.remove();
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+            let magnitude = Math.sqrt(dx * dx + dy * dy);
+            let initialSpeed = magnitude / 27; // Adjust based on your game's scale
+            let vx = (dx / magnitude) * initialSpeed;
+            let vy = (dy / magnitude) * initialSpeed;
+            animateBall(cueBall, vx, vy); // Start the cue ball animation
+            checkCollisionWithBall(); // Check for initial collisions if any
+        }
+        function animateBall(ball, vx, vy) {
+            movingBallsCount++;
+            let friction = 0.98; // Adjust friction if needed
+            const mX = 25; // Left cushion
+            const maX = 650; // Right cushion
+            const mY = 25; // Top cushion
+            const maY = 1325; // Bottom cushion
+
+            const animationStep = () => {
+                let rafId = ball.getAttribute('rafId');
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                }
+
+                let cx = parseFloat(ball.getAttribute('cx')) + vx;
+                let cy = parseFloat(ball.getAttribute('cy')) + vy;
+
+                // Bounce off the sides by inverting velocity
+                if (cx <= mX + 14.25 || cx >= maX - 14.25) { // Account for ball radius
+                    vx = -vx;
+                }
+                if (cy <= mY + 14.25 || cy >= maY - 14.25) { // Account for ball radius
+                    vy = -vy;
+                }
+
+                // Ensure ball stays within bounds, correcting any overshoot
+                cx = Math.max(mX + 14.25, Math.min(maX - 14.25, cx));
+                cy = Math.max(mY + 14.25, Math.min(maY - 14.25, cy));
+
+
+                if (isBallInHole(cx, cy)) {
+                    resetCueBall(); 
+                    return; 
+                } else {
+                    ball.setAttribute('cx', cx);
+                    ball.setAttribute('cy', cy);
+                    ball.setAttribute('data-vx', vx);
+                    ball.setAttribute('data-vy', vy);
+
+                    // Apply friction
+                    vx *= friction;
+                    vy *= friction;
+
+                    // Continue animating if velocity is above a minimal threshold
+                    if (Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1) {
+                        let newRafId = requestAnimationFrame(animationStep);
+                        ball.setAttribute('rafId', newRafId);
+                    } else {
+                        movingBallsCount--;
+                        if (movingBallsCount === 0) {
+                            switchPlayer();
+                        }
+                    }
+                };
+            }
+            animationStep();
+        }
+        animateBall('cue-ball', 10, 5);
+
+        function checkCollisionWithBall(cx, cy, vx, vy) {
+            const balls = document.querySelectorAll('.ball, #white-ball');
+            balls.forEach((ball) => {
+            if (ball !== movingBall) {
+                let ax = parseFloat(movingBall.getAttribute('cx'));
+                let ay = parseFloat(movingBall.getAttribute('cy'));
+                let bx = parseFloat(ball.getAttribute('cx'));
+                let by = parseFloat(ball.getAttribute('cy'));
+
+                let dx = bx - ax;
+                let dy = by - ay;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Check if balls are overlapping
+                if (distance < 28.5) { // Assuming ball diameter is 28.5 units
+                    // Normal vector (direction of impact)
+                    let nx = dx / distance;
+                    let ny = dy / distance;
+
+                    // Relative velocity
+                    let vx = parseFloat(movingBall.getAttribute('data-vx')) - parseFloat(ball.getAttribute('data-vx') || 0);
+                    let vy = parseFloat(movingBall.getAttribute('data-vy')) - parseFloat(ball.getAttribute('data-vy') || 0);
+
+                    // Speed of approach using dot product
+                    let approachSpeed = vx * nx + vy * ny;
+
+                    // Do not process separating balls
+                    if (approachSpeed > 0) {
+                        return;
+                    }
+
+                    // Apply simple elastic collision response (assuming equal mass)
+                    let impulse = 2 * approachSpeed / 2;
+                    let impulsex = impulse * nx;
+                    let impulsey = impulse * ny;
+
+                    // Update velocities
+                    movingBall.setAttribute('data-vx', parseFloat(movingBall.getAttribute('data-vx')) + impulsex);
+                    movingBall.setAttribute('data-vy', parseFloat(movingBall.getAttribute('data-vy')) + impulsey);
+
+                    ball.setAttribute('data-vx', parseFloat(ball.getAttribute('data-vx') || 0) - impulsex);
+                    ball.setAttribute('data-vy', parseFloat(ball.getAttribute('data-vy') || 0) - impulsey);
+
+                    // Trigger animation for the static ball if it was hit
+                    animateBall(ball, parseFloat(ball.getAttribute('data-vx')), parseFloat(ball.getAttribute('data-vy')));
+                }
+            }
+        });
+
+        }
+
+        function isBallInHole(cx, cy) {
+            const holesRadius = 28.5; // Approximate radius for the hole detection
+            const holesPos = [
+                { x: 0, y: 0 },
+                //{ x: 337.5, y: 0 },
+                { x: 675, y: 0 },
+                { x: 0, y: 675 },
+                { x: 675, y: 675 },
+                { x: 0, y: 1350 },
+                //{ x: 337.5, y: 1350 },
+                { x: 675.0, y: 1350.0 },
+            ];
+
+            return holesPos.some(hole => {
+                const distance = Math.sqrt((hole.x - cx) ** 2 + (hole.y - cy) ** 2);
+                return distance <= 57;
+            });
+        }
+
+        function resetCueBall() {
+            cueBall.setAttribute('cx', '337.5');
+            cueBall.setAttribute('cy', '1012.5');
+
+            if (movingBallsCount > 0) {
+                movingBallsCount--;
+            }
+
+            // If no balls are moving, switch players
+            if (movingBallsCount === 0) {
+                switchPlayer();
+            }
+        }
+
+        function getSVGPoint(event) {
+            let pt = poolTable.createSVGPoint();
+            pt.x = event.clientX;
+            pt.y = event.clientY;
+            return pt.matrixTransform(poolTable.getScreenCTM().inverse());
+        }
+    </script>    
+</body>
+</html>

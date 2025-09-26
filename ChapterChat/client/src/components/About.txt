@@ -1,0 +1,2 @@
+Components just holds pieces of screens. 
+Reusable components like navbar, toast messages etc
